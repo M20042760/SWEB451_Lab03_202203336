@@ -13,10 +13,15 @@ public class Lab03PlayerController : MonoBehaviour
     [SerializeField] private float moveSpeed = 5f;
     [SerializeField] private float sprintMultiplier = 1.5f;
     [SerializeField] private float jumpImpulse = 6f;
+    [SerializeField] private float acceleration = 20f;
+    [SerializeField] private float deceleration = 25f;
 
     [Header("Ground Check")]
     [SerializeField] private float groundCheckDistance = 1.1f;
     [SerializeField] private LayerMask groundLayers;
+
+    [Header("Feedback")]
+    [SerializeField] private TrailRenderer sprintTrail;
 
     private Rigidbody rb;
     private Vector2 moveInput;
@@ -25,6 +30,11 @@ public class Lab03PlayerController : MonoBehaviour
     private void Awake()
     {
         rb = GetComponent<Rigidbody>();
+
+        if (sprintTrail != null)
+        {
+            sprintTrail.emitting = false;
+        }
     }
 
     private void OnEnable()
@@ -43,6 +53,11 @@ public class Lab03PlayerController : MonoBehaviour
         moveAction.action.Disable();
         jumpAction.action.Disable();
         sprintAction.action.Disable();
+
+        if (sprintTrail != null)
+        {
+            sprintTrail.emitting = false;
+        }
     }
 
     private void Update()
@@ -60,17 +75,37 @@ public class Lab03PlayerController : MonoBehaviour
             direction.Normalize();
         }
 
-        float activeSpeed = sprintAction.action.IsPressed()
+        bool isMoving = direction.sqrMagnitude > 0.001f;
+        bool isSprinting =
+            sprintAction.action.IsPressed() && isMoving;
+
+        float activeSpeed = isSprinting
             ? moveSpeed * sprintMultiplier
             : moveSpeed;
 
-        Vector3 desiredHorizontal = direction * activeSpeed;
+        Vector3 targetHorizontal = direction * activeSpeed;
         Vector3 currentVelocity = rb.linearVelocity;
+        Vector3 currentHorizontal =
+            new Vector3(currentVelocity.x, 0f, currentVelocity.z);
+
+        float rate = targetHorizontal.sqrMagnitude > 0.001f
+            ? acceleration
+            : deceleration;
+
+        Vector3 nextHorizontal = Vector3.MoveTowards(
+            currentHorizontal,
+            targetHorizontal,
+            rate * Time.fixedDeltaTime);
 
         rb.linearVelocity = new Vector3(
-            desiredHorizontal.x,
+            nextHorizontal.x,
             currentVelocity.y,
-            desiredHorizontal.z);
+            nextHorizontal.z);
+
+        if (sprintTrail != null)
+        {
+            sprintTrail.emitting = isSprinting;
+        }
 
         if (jumpRequested && IsGrounded())
         {
